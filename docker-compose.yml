@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:17.0
+    restart: on-failure:0
+    ports:
+      - "5440:5432"
+    environment:
+      - POSTGRES_USER=app-user
+      - POSTGRES_PASSWORD=fl2185JHdnde0
+      - POSTGRES_DB=app-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - network
+
+  weaviate:
+    image: semitechnologies/weaviate:1.33.0
+    restart: on-failure:0
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --scheme
+      - http
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      CLUSTER_HOSTNAME: "node1"
+      ENABLE_MODULES: text2vec-openai,backup-filesystem
+      BACKUP_FILESYSTEM_PATH: /var/lib/weaviate/backups
+      # OpenAI API key for text2vec-openai module
+      OPENAI_APIKEY: ${OPENAI_API_KEY}
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    ports:
+      - 8080:8080
+      - 50051:50051
+    networks:
+      - network
+
+volumes:
+  weaviate_data:
+  postgres_data:
+networks:
+  network:
+    name: ai-assistant-network
+    driver: bridge
