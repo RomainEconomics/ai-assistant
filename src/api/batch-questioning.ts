@@ -143,7 +143,7 @@ Please provide a clear, concise answer. Cite specific page numbers when relevant
             model: aiModel,
             prompt,
             temperature: 0.3,
-            maxTokens: 2000,
+            maxOutputTokens: 2000,
           });
 
           const answer = result.text;

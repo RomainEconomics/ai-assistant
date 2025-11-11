@@ -75,7 +75,7 @@ export async function summarizeDocument(
           model: DEFAULT_MODEL,
           prompt: pagePrompt,
           temperature: 0.3,
-          maxTokens: 200,
+          maxOutputTokens: 200,
         });
         console.log(`[AI-Analysis] Summarized page ${idx + 1}/${pages.length}`);
         return result.text;
@@ -90,7 +90,7 @@ export async function summarizeDocument(
       model: DEFAULT_MODEL,
       prompt: finalPrompt,
       temperature: 0.3,
-      maxTokens: Math.ceil(maxLength * 1.5), // Account for token-to-word ratio
+      maxOutputTokens: Math.ceil(maxLength * 1.5), // Account for token-to-word ratio
     });
 
     summary = finalResult.text;
@@ -102,7 +102,7 @@ export async function summarizeDocument(
       model: DEFAULT_MODEL,
       prompt,
       temperature: 0.3,
-      maxTokens: Math.ceil(maxLength * 1.5),
+      maxOutputTokens: Math.ceil(maxLength * 1.5),
     });
 
     summary = result.text;
@@ -171,7 +171,7 @@ ${fullText}`;
     model: DEFAULT_MODEL,
     prompt,
     temperature: 0.3,
-    maxTokens: 1000,
+    maxOutputTokens: 1000,
   });
 
   // Parse JSON response
@@ -257,7 +257,7 @@ ${fullText}`;
     model: DEFAULT_MODEL,
     prompt,
     temperature: 0.2,
-    maxTokens: 2000,
+    maxOutputTokens: 2000,
   });
 
   // Parse JSON response
@@ -347,7 +347,7 @@ ${fullText}`;
     model: DEFAULT_MODEL,
     prompt,
     temperature: 0.3,
-    maxTokens: 1000,
+    maxOutputTokens: 1000,
   });
 
   // Parse JSON response

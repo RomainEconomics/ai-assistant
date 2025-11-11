@@ -255,9 +255,7 @@ export async function initializeDatabase() {
 
   // Create indexes for better query performance
   // User and session indexes
-  await db`CREATE INDEX IF NOT EXISTS idx_users_auth_user_id ON users(auth_user_id)`;
   await db`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`;
-  await db`CREATE INDEX IF NOT EXISTS idx_users_auth_client_id ON users(auth_client_id)`;
   await db`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`;
   await db`CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token)`;
   await db`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`;
@@ -293,10 +291,28 @@ export async function initializeDatabase() {
   // Create default user if none exists
   const users = await db`SELECT COUNT(*) as count FROM users`;
   if (users[0]?.count === 0) {
-    await db`
-      INSERT INTO users (email, name)
-      VALUES ('admin@localhost', 'Default User')
+    const result = await db`
+      INSERT INTO users (email, name, username, roles, is_active, last_login, created_at, updated_at)
+      VALUES (
+        'admin@localhost',
+        'Default User',
+        'admin',
+        ${JSON.stringify(["user"])},
+        1,
+        ${new Date().toISOString()},
+        ${new Date().toISOString()},
+        ${new Date().toISOString()}
+      )
+      RETURNING id
     `;
+    const userId = result[0].id;
+
+    // Create user preferences for default user
+    await db`
+      INSERT INTO user_preferences (user_id)
+      VALUES (${userId})
+    `;
+
     console.log('✅ Created default user');
   }
 
@@ -1234,14 +1250,7 @@ export async function deleteExpiredSessions(): Promise<number> {
   return result.length;
 }
 
-export async function getUserByAuthUserId(authUserId: number): Promise<User | null> {
-  const result = await db`
-    SELECT * FROM users
-    WHERE auth_user_id = ${authUserId}
-    LIMIT 1
-  `;
-  return result[0] as User | null;
-}
+// Removed: getUserByAuthUserId - auth_user_id column no longer exists
 
 export async function getUserByUsername(username: string): Promise<User | null> {
   const result = await db`

@@ -76,6 +76,31 @@ export function calculateFileHash(buffer: Buffer): string {
 }
 
 /**
+ * Check if S3 bucket exists
+ */
+export async function checkBucketExists(): Promise<boolean> {
+  try {
+    const credentials = getS3Credentials();
+
+    // Try to list objects in the bucket (this will fail if bucket doesn't exist)
+    await S3Client.list({ prefix: "", maxKeys: 1 }, credentials);
+    return true;
+  } catch (error: any) {
+    // Bucket doesn't exist or we don't have access
+    if (error.code === "NoSuchBucket") {
+      console.error(`\n❌ S3 bucket does not exist: ${getS3Credentials().bucket}`);
+      console.error(`⚠️  Please create the bucket manually before uploading files.`);
+      console.error(`   Bucket name: ${getS3Credentials().bucket}`);
+      console.error(`   Region: ${getS3Credentials().region}\n`);
+      return false;
+    }
+
+    console.error("Failed to check if bucket exists:", error);
+    return false;
+  }
+}
+
+/**
  * Upload a file to S3
  */
 export async function uploadToS3(
@@ -88,6 +113,12 @@ export async function uploadToS3(
 
     // Convert Buffer to Uint8Array if needed
     const data = body instanceof Buffer ? new Uint8Array(body) : body;
+
+    // Check bucket exists before upload
+    const bucketExists = await checkBucketExists();
+    if (!bucketExists) {
+      throw new Error(`S3 bucket does not exist: ${credentials.bucket}. Please create the bucket manually.`);
+    }
 
     // Upload using Bun's S3Client
     await S3Client.write(

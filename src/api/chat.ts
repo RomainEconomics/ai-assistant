@@ -131,7 +131,7 @@ export async function handleChatStream(req: ServerRequest) {
       model,
       messages: conversationMessages,
       temperature: 0.7,
-      maxTokens: 2000,
+      maxOutputTokens: 2000,
     });
 
     // Create a custom streaming response
