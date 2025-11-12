@@ -45,7 +45,7 @@ This application provides an in-house chat interface for:
 - **Routing & State**: TanStack Query for data fetching (no TanStack Router used)
 - **Backend**: Bun.serve() with REST API endpoints
 - **Database**: SQLite3 with PostgreSQL-compatible schema (via Bun's SQL API)
-- **AI Integration**: AI SDK (`ai`, `@ai-sdk/openai`, `@ai-sdk/anthropic`)
+- **AI Integration**: AI SDK 6 Beta (`ai@6.0.0-beta`, `@ai-sdk/openai@3.0.0-beta`, `@ai-sdk/anthropic@3.0.0-beta`)
 - **Vector Database**: Weaviate 1.33.0 with text2vec-openai module
 - **Storage**: OVH S3 (via Bun's built-in S3Client)
 - **PDF Processing**: pdf-parse v2 with Worker threads
@@ -349,13 +349,15 @@ Start the services:
 # Start Weaviate with Docker Compose
 docker compose up -d weaviate
 
-# Start the development server
+# Start the development server (automatically initializes Weaviate collections)
 bun dev
 # or
 bun --hot src/index.tsx
 ```
 
 Server runs at `http://localhost:3001`
+
+**Note**: The application automatically checks Weaviate health and creates necessary collections at startup. If Weaviate is unavailable, the app will start with a warning but vector search features will be disabled. See [WEAVIATE_STARTUP.md](./WEAVIATE_STARTUP.md) for details.
 
 ### Production
 
@@ -424,7 +426,7 @@ const result = streamText({
   model: provider === "openai" ? openai(modelName) : anthropic(modelName),
   messages: conversationHistory,
   temperature: 0.7,
-  maxTokens: 2000,
+  maxOutputTokens: 2000,
 });
 
 // Stream to client
@@ -853,11 +855,20 @@ function MyComponent() {
 ### Phase 2.5 - DeepAgent Analysis ✅
 
 - ✅ **DeepAgent Integration**
-  - Port of langchain-ai/deepagentsjs for TypeScript
+  - Built with AI SDK v6 (ToolLoopAgent) - hierarchical multi-agent system
   - Specialized AI agents for comprehensive document analysis
   - Background worker processing (non-blocking, prevents HTTP timeouts)
   - Real-time status polling (every 3 seconds)
   - Full execution history tracking
+
+- ✅ **Hierarchical Multi-Agent Architecture**
+  - **Phase 1: Discovery Agent** - Maps document structure and locates relevant sections
+  - **Phase 2: Extraction Agents (Parallel)** - Four specialized agents run in parallel:
+    - Emissions Extractor: GHG emissions data (Scope 1, 2, 3)
+    - Targets Extractor: Climate targets and commitments
+    - Investment Extractor: CapEx allocation and energy transition finance
+    - Risk Extractor: Climate risks and TCFD disclosures
+  - **Phase 3: Synthesis Agent** - Aggregates findings, performs trend analysis, identifies gaps
 
 - ✅ **Weaviate-based Tools**
   - Custom tool implementations using existing Weaviate setup
@@ -868,16 +879,16 @@ function MyComponent() {
   - All tools scoped to specific documents via `file_slug`
 
 - ✅ **Pre-configured Agents**
-  - **Simple Document Q&A** - Fast, lightweight agent for quick queries (1-2 minutes)
-    - Basic document understanding and information extraction
-    - Efficient for testing and simple questions
-  - **ESG Environmental Strategy Analyst** - Comprehensive ESG analysis (10-15 minutes)
+  - **ESG Environmental Strategy Analyst** - Comprehensive hierarchical ESG analysis (10-15 minutes)
+    - Three-phase analysis: Discovery → Extraction (parallel) → Synthesis
     - Expert in GHG emissions, climate targets, energy transition finance
     - Analyzes TCFD compliance, greenwashing indicators, data gaps
     - Produces structured reports with page citations and critical assessment
 
 - ✅ **Database Schema**
   - `agent_runs` table - Execution history with status tracking
+    - `result` - Final synthesis output (displayed to user)
+    - `intermediate_results` - JSON with all phase results (discovery, emissions, targets, investments, risks)
   - `agent_messages` table - Step-by-step execution logs (for future debugging)
   - Full support for completed, failed, and running states
   - Automatic duration calculation on completion
@@ -904,6 +915,7 @@ function MyComponent() {
   - Real-time status updates with loading indicators
   - History dialog with filterable past runs
   - Markdown-rendered results with proper formatting
+  - **Page Citations**: All results include page references in format `[Page X]` or `[Pages X-Y]` for PDF linking
   - Mobile-responsive design
 
 - ✅ **Developer Experience**
@@ -915,10 +927,17 @@ function MyComponent() {
 
 **Route**: `/deepagent` | **Component**: `src/pages/DeepAgentPage.tsx` | **API**: `src/api/deepagent.ts` | **Worker**: `src/workers/deepagent-worker.ts`
 
+**Agent Implementation Files**:
+- `src/lib/agents/coordinator.ts` - Orchestrates the multi-agent system
+- `src/lib/agents/discovery-agent.ts` - Content mapping and section location
+- `src/lib/agents/extraction-agents.ts` - Four specialized extraction agents
+- `src/lib/agents/synthesis-agent.ts` - Aggregation and critical analysis
+- `src/lib/agents/tools.ts` - Weaviate-based search tools
+
 **Dependencies**:
-- `deepagents` - TypeScript deep agent framework
-- `@langchain/core` - LangChain core functionality
-- `@langchain/openai` - OpenAI model integration
+- `ai` - AI SDK v6 with ToolLoopAgent support
+- `@ai-sdk/openai` - OpenAI model integration
+- `weaviate-client` - Vector database access
 - `zod` - Schema validation for tool parameters
 
 **Usage Example:**
@@ -937,12 +956,13 @@ export const MY_CUSTOM_AGENT: DeepAgentConfig = {
 **How It Works:**
 1. User selects agent and document, optionally enters custom query
 2. API creates run record in database with status='running'
-3. Background worker spawned to execute agent
+3. Background worker spawned to execute hierarchical agent system
 4. Frontend polls for status every 3 seconds
-5. Worker uses Weaviate tools to search/retrieve document content
-6. LLM processes information using agent's system prompt
-7. On completion, result saved to database with status='completed'
-8. Frontend displays markdown-formatted results
+5. **Phase 1**: Discovery agent maps document structure using Weaviate tools
+6. **Phase 2**: Four extraction agents run in parallel, each using discovery context
+7. **Phase 3**: Synthesis agent aggregates findings and produces final report
+8. On completion, synthesis result saved to database with status='completed'
+9. Frontend displays markdown-formatted results
 
 ## Future Enhancements
 

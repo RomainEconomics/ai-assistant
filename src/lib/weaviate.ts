@@ -62,6 +62,35 @@ export async function checkWeaviateHealth(): Promise<boolean> {
 }
 
 /**
+ * Initialize Weaviate - check health and create collections if needed
+ * Called at application startup
+ */
+export async function initializeWeaviate(): Promise<void> {
+  try {
+    console.log("🔍 Checking Weaviate connection...");
+
+    const isHealthy = await checkWeaviateHealth();
+    if (!isHealthy) {
+      console.warn("⚠️  Weaviate is not available - vector search features will be disabled");
+      return;
+    }
+
+    console.log("✅ Weaviate is healthy");
+
+    const client = await getWeaviateClient();
+    try {
+      await createWeaviateCollections(client);
+      console.log("✅ Weaviate initialization complete");
+    } finally {
+      await client.close();
+    }
+  } catch (error) {
+    console.error("❌ Failed to initialize Weaviate:", error);
+    console.warn("⚠️  Vector search features may not work correctly");
+  }
+}
+
+/**
  * Create Weaviate collections if they don't exist
  */
 export async function createWeaviateCollections(
@@ -154,8 +183,6 @@ export async function createWeaviateCollections(
           "A chunk of a document (Child Document). This is the child of the ParentDocument class. The vectorizer is needed for this class since the similarity will be performed on the ChildDocument class.",
         vectorizers: vectorizer.text2VecOpenAI({
           model: "text-embedding-3-small",
-          modelVersion: "003",
-          type: "text",
         }),
         properties: [
           {

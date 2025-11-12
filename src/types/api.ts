@@ -1,4 +1,4 @@
-import type { Conversation, Message, Project } from './database';
+import type { Conversation, Message, Project } from "./database";
 
 // Request types
 export interface CreateProjectRequest {
@@ -16,7 +16,7 @@ export interface UpdateProjectRequest {
 export interface CreateConversationRequest {
   project_id: number;
   title: string;
-  model_provider: 'openai' | 'anthropic';
+  model_provider: "openai" | "anthropic";
   model_name: string;
 }
 
@@ -28,7 +28,7 @@ export interface SendMessageRequest {
 export interface ChatStreamRequest {
   conversation_id: number;
   message: string;
-  model_provider: 'openai' | 'anthropic';
+  model_provider: "openai" | "anthropic";
   model_name: string;
 }
 
@@ -65,15 +65,15 @@ export interface ModelsResponse {
 // Available AI models
 export const AI_MODELS = {
   openai: [
-    { id: 'gpt-4o', name: 'GPT-4 Omni' },
-    { id: 'gpt-4o-mini', name: 'GPT-4 Omni Mini' },
-    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-    { id: 'gpt-4', name: 'GPT-4' },
+    { id: "gpt-5-mini", name: "GPT-5 Mini" },
+    { id: "gpt-5", name: "GPT-5" },
+    { id: "gpt-4o", name: "GPT-4 Omni" },
+    { id: "gpt-4o-mini", name: "GPT-4 Omni Mini" },
   ],
   anthropic: [
-    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
-    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
+    { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet" },
+    { id: "claude-3-opus-20240229", name: "Claude 3 Opus" },
+    { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet" },
+    { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku" },
   ],
 } as const;

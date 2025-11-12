@@ -1,6 +1,7 @@
 import { serve } from "bun";
 import index from "./index.html";
 import { initializeDatabase } from "./lib/db";
+import { initializeWeaviate } from "./lib/weaviate";
 
 // Import API handlers
 import {
@@ -90,6 +91,9 @@ import {
 
 // Initialize database
 await initializeDatabase();
+
+// Initialize Weaviate (vector database)
+await initializeWeaviate();
 
 const server = serve({
   routes: {

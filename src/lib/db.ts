@@ -229,6 +229,7 @@ export async function initializeDatabase() {
       query TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed')),
       result TEXT,
+      intermediate_results TEXT,
       error TEXT,
       started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       completed_at DATETIME,
@@ -237,6 +238,13 @@ export async function initializeDatabase() {
       FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     )
   `;
+
+  // Migration: Add intermediate_results column if it doesn't exist
+  try {
+    await db`ALTER TABLE agent_runs ADD COLUMN intermediate_results TEXT`;
+  } catch (error) {
+    // Column already exists, ignore error
+  }
 
   // Agent messages table (for step-by-step tracking of agent execution)
   await db`
@@ -1310,10 +1318,11 @@ export async function updateAgentRun(
   data: {
     status?: 'running' | 'completed' | 'failed';
     result?: string;
+    intermediate_results?: string;
     error?: string;
   }
 ): Promise<void> {
-  const { status, result, error } = data;
+  const { status, result, intermediate_results, error } = data;
 
   // For simplicity, handle each update case separately
   if (status === 'completed') {
@@ -1322,6 +1331,7 @@ export async function updateAgentRun(
       UPDATE agent_runs
       SET status = ${status},
           result = ${result || null},
+          intermediate_results = ${intermediate_results || null},
           completed_at = CURRENT_TIMESTAMP,
           duration_seconds = CAST((julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 86400 AS INTEGER)
       WHERE id = ${id}

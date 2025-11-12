@@ -15,6 +15,7 @@ import {
   XCircle,
   Play,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +43,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarkdownMessage } from "@/components/MarkdownMessage";
+import { MarkdownWithPageLinks } from "@/components/MarkdownWithPageLinks";
+import { PdfViewer } from "@/components/PdfViewer";
 import { authenticatedFetch } from "@/lib/api-client";
 import { useDocuments } from "@/hooks/useApi";
 import { toast } from "sonner";
@@ -69,6 +72,11 @@ export function DeepAgentPage() {
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [history, setHistory] = useState<AgentRunWithDocument[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedPdf, setSelectedPdf] = useState<{
+    documentId: number;
+    filename: string;
+    pageNumber: number;
+  } | null>(null);
 
   const completedDocs =
     documents?.filter((d) => d.processing_status === "completed") || [];
@@ -100,6 +108,8 @@ export function DeepAgentPage() {
   );
 
   const pollingIntervalRef = useRef<number | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const lastScrollPosition = useRef<number>(0);
 
   // Poll for agent run status
   const pollRunStatus = async (currentRunId: string) => {
@@ -217,6 +227,38 @@ export function DeepAgentPage() {
     setIsHistoryOpen(false);
   };
 
+  const handlePageClick = (pageNumber: number) => {
+    if (!selectedDocument) {
+      toast.error("Document not found");
+      return;
+    }
+
+    // Save current scroll position before state update
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      lastScrollPosition.current = viewport.scrollTop;
+    }
+
+    setSelectedPdf({
+      documentId: selectedDocument.id,
+      filename: selectedDocument.filename,
+      pageNumber,
+    });
+  };
+
+  // Restore scroll position after PDF dialog state changes
+  useEffect(() => {
+    if (selectedPdf) {
+      // Restore scroll position after a small delay to allow React to render
+      const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport && lastScrollPosition.current > 0) {
+        setTimeout(() => {
+          viewport.scrollTop = lastScrollPosition.current;
+        }, 0);
+      }
+    }
+  }, [selectedPdf]);
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
@@ -231,9 +273,14 @@ export function DeepAgentPage() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-6xl mx-auto space-y-6">
+    <div className="flex h-full overflow-hidden">
+      {/* Main content area */}
+      <div
+        className={`flex flex-col flex-1 overflow-hidden ${selectedPdf ? "pr-[min(50vw,calc(100vw-var(--sidebar-width,16rem)-24rem))]" : ""}`}
+        style={{ transition: "padding-right 0.3s ease" }}
+      >
+        <div className="flex-1 overflow-auto p-6">
+          <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
@@ -410,14 +457,22 @@ export function DeepAgentPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <ScrollArea className="h-[600px] w-full rounded-md border p-4">
-                      <MarkdownMessage content={result} />
+                    <div className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Click on page references to open the PDF
+                    </div>
+                    <ScrollArea ref={scrollAreaRef} className="h-[600px] w-full rounded-md border p-4">
+                      <MarkdownWithPageLinks
+                        content={result}
+                        onPageClick={handlePageClick}
+                      />
                     </ScrollArea>
                   </CardContent>
                 </Card>
               )}
             </TabsContent>
           </Tabs>
+          </div>
         </div>
       </div>
 
@@ -493,6 +548,40 @@ export function DeepAgentPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* PDF Viewer - Fixed side panel */}
+      {selectedPdf && (
+        <div
+          className="fixed top-0 bottom-0 right-0 border-l flex flex-col overflow-hidden bg-background z-10"
+          style={{
+            width:
+              "min(50vw, calc(100vw - var(--sidebar-width, 16rem) - 24rem))",
+            minWidth: "400px",
+          }}
+        >
+          <div className="flex items-center justify-between border-b p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
+            <h2 className="font-semibold text-lg truncate">
+              {selectedPdf.filename}
+            </h2>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setSelectedPdf(null)}
+              aria-label="Close PDF viewer"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <PdfViewer
+              fileUrl={`/api/documents/${selectedPdf.documentId}/pdf`}
+              fileName={selectedPdf.filename}
+              initialPage={selectedPdf.pageNumber}
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

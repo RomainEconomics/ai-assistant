@@ -1,10 +1,19 @@
 /**
  * DeepAgent Worker
  * Runs deep agent analysis in a background worker thread
+ * Uses AI SDK v6 with hierarchical multi-agent system
  */
-import { createDeepAgent } from "deepagents";
-import { ChatOpenAI } from "@langchain/openai";
-import { createWeaviateTools } from "../lib/deepagent-tools.ts";
+import { openai } from "@ai-sdk/openai";
+import { WeaviateTools } from "../lib/agents/tools.ts";
+import { CoordinatorAgent } from "../lib/agents/coordinator.ts";
+import { createDiscoveryAgent } from "../lib/agents/discovery-agent.ts";
+import {
+  createEmissionsExtractor,
+  createTargetsExtractor,
+  createInvestmentExtractor,
+  createRiskExtractor,
+} from "../lib/agents/extraction-agents.ts";
+import { createSynthesisAgent } from "../lib/agents/synthesis-agent.ts";
 import { getAgentConfig } from "../lib/deepagent-configs.ts";
 import {
   updateAgentRun,
@@ -38,7 +47,7 @@ self.onmessage = async (event: MessageEvent<DeepAgentWorkerMessage>) => {
 };
 
 /**
- * Run deep agent analysis
+ * Run deep agent analysis using AI SDK v6
  */
 async function runDeepAgent(runId: string): Promise<void> {
   const startTime = Date.now();
@@ -67,56 +76,71 @@ async function runDeepAgent(runId: string): Promise<void> {
 
     sendProgress(runId, `Loading document: ${document.filename}`);
 
-    // Create Weaviate tools for this document
-    const tools = createWeaviateTools({
-      fileSlug: document.file_slug,
-      filename: document.filename,
-    });
+    // Configuration
+    const MODEL = "gpt-5-mini"; // DO NOT MODIFY this line
+    const WEAVIATE_URL = process.env.WEAVIATE_HOST || "http://localhost:8080";
+    const FILE_SLUG = document.file_slug;
 
-    sendProgress(runId, "Creating AI model...");
+    sendProgress(runId, "Connecting to Weaviate...");
 
-    // Create LLM model
-    const model = new ChatOpenAI({
-      modelName: "gpt-4o",
-      temperature: 0.7,
-      openAIApiKey: process.env.OPENAI_API_KEY,
-    });
+    // Initialize Weaviate tools
+    const weaviateTools = new WeaviateTools(WEAVIATE_URL);
+    const tools = weaviateTools.createTools(FILE_SLUG);
 
-    sendProgress(runId, "Starting deep agent analysis...");
+    sendProgress(runId, "Creating agent system...");
 
-    // Create deep agent
-    const agent = createDeepAgent({
-      model,
-      tools,
-      systemPrompt: agentConfig.systemPrompt,
+    // Create all agents
+    const discoveryAgent = createDiscoveryAgent(MODEL, tools);
+    const emissionsAgent = createEmissionsExtractor(MODEL, tools);
+    const targetsAgent = createTargetsExtractor(MODEL, tools);
+    const investmentAgent = createInvestmentExtractor(MODEL, tools);
+    const riskAgent = createRiskExtractor(MODEL, tools);
+    const synthesisAgent = createSynthesisAgent(MODEL);
+
+    // Create coordinator with progress callback
+    const coordinator = new CoordinatorAgent({
+      discoveryAgent,
+      emissionsAgent,
+      targetsAgent,
+      investmentAgent,
+      riskAgent,
+      synthesisAgent,
+      onProgress: (message: string) => {
+        sendProgress(runId, message);
+      },
     });
 
     console.log(
       `[DeepAgent Worker] Starting run ${runId} with agent ${agentConfig.id} on document ${document.filename}`
     );
 
-    // Run agent
-    const result = await agent.invoke({
-      messages: [{ role: "user", content: agentRun.query }],
-    });
+    sendProgress(runId, "Starting deep agent analysis...");
+
+    // Run the hierarchical analysis
+    const results = await coordinator.runAnalysis(
+      agentRun.query || "environmental strategy and climate action"
+    );
 
     const endTime = Date.now();
     const durationSeconds = Math.round((endTime - startTime) / 1000);
 
-    // Extract the final answer from the messages
-    const finalMessage = result.messages[result.messages.length - 1];
-    const finalAnswer = finalMessage.content;
+    // Get the formatted result (synthesis output)
+    const finalResult = coordinator.getFormattedResult();
+
+    // Get intermediate results for storage
+    const intermediateResults = coordinator.getIntermediateResults();
 
     console.log(`[DeepAgent Worker] Run ${runId} completed in ${durationSeconds}s`);
 
-    // Update agent run with result
+    // Update agent run with result and intermediate results
     await updateAgentRun(runId, {
       status: "completed",
-      result: finalAnswer,
+      result: finalResult,
+      intermediate_results: intermediateResults,
     });
 
     // Send completion message
-    sendCompleted(runId, finalAnswer, durationSeconds);
+    sendCompleted(runId, finalResult, durationSeconds);
   } catch (error) {
     console.error(`[DeepAgent Worker] Run ${runId} failed:`, error);
 
