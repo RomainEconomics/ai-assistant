@@ -38,7 +38,7 @@ export function DocumentMultiSelector({
       (doc) =>
         doc.filename.toLowerCase().includes(query) ||
         doc.company_name?.toLowerCase().includes(query) ||
-        doc.report_type?.toLowerCase().includes(query)
+        doc.report_type?.toLowerCase().includes(query),
     );
   }, [documents, searchQuery]);
 
@@ -116,12 +116,14 @@ export function DocumentMultiSelector({
 
       {/* Document List */}
       <ScrollArea className="h-[400px] rounded-md border">
-        <div className="p-4 space-y-2">
+        <div className="p-4 pr-3 space-y-2">
           {filteredDocuments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mb-2 opacity-50" />
               <p>
-                {searchQuery ? "No documents match your search" : "No documents available"}
+                {searchQuery
+                  ? "No documents match your search"
+                  : "No documents available"}
               </p>
             </div>
           ) : (
@@ -139,7 +141,7 @@ export function DocumentMultiSelector({
                   } ${isMaxReached ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={() => !isMaxReached && handleToggle(doc.id)}
                 >
-                  <div className="mt-0.5">
+                  <div className="mt-0.5 flex-shrink-0">
                     {isSelected ? (
                       <CheckSquare className="h-5 w-5 text-primary" />
                     ) : (
@@ -147,41 +149,51 @@ export function DocumentMultiSelector({
                     )}
                   </div>
 
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <div className="flex items-start gap-2 mb-1">
-                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      <span className="font-medium text-sm break-words line-clamp-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span
+                        className="font-medium text-sm truncate"
+                        title={doc.filename}
+                      >
                         {doc.filename}
                       </span>
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground mt-2">
                       {doc.company_name && (
-                        <Badge variant="outline" className="text-xs truncate max-w-[120px]">
-                          {doc.company_name}
-                        </Badge>
+                        <span
+                          className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium overflow-hidden max-w-[120px]"
+                          title={doc.company_name}
+                        >
+                          <span className="truncate">{doc.company_name}</span>
+                        </span>
                       )}
                       {doc.report_type && (
-                        <Badge variant="outline" className="text-xs">
+                        <span
+                          className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium"
+                          title={doc.report_type}
+                        >
                           {doc.report_type}
-                        </Badge>
+                        </span>
                       )}
                       {doc.reporting_year && (
-                        <Badge variant="outline" className="text-xs">
+                        <span className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium">
                           {doc.reporting_year}
-                        </Badge>
+                        </span>
                       )}
-                      <span className="whitespace-nowrap">{formatFileSize(doc.file_size)}</span>
+                      <span className="text-xs">
+                        {formatFileSize(doc.file_size)}
+                      </span>
                       {doc.pages_processed && (
-                        <span className="whitespace-nowrap">{doc.pages_processed} pages</span>
+                        <span className="text-xs">
+                          {doc.pages_processed} pages
+                        </span>
                       )}
                     </div>
 
                     {doc.processing_status !== "completed" && (
-                      <Badge
-                        variant="secondary"
-                        className="mt-2 text-xs"
-                      >
+                      <Badge variant="secondary" className="mt-2 text-xs">
                         {doc.processing_status}
                       </Badge>
                     )}

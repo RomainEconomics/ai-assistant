@@ -16,7 +16,11 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        // IMPORTANT: The [&>div] selectors override Radix's internal `display: table` inline style
+        // which causes content to expand beyond container width. These classes force block display
+        // and proper width constraints to prevent horizontal overflow issues.
+        // DO NOT REMOVE: Removing these will break layout in components like DocumentMultiSelector.
+        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1 [&>div]:!block [&>div]:!w-full [&>div]:!max-w-full"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
