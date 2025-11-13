@@ -1,10 +1,38 @@
 # AI Assistant
 
+> **Note**: This is a toy/experimental project built to explore what's possible with modern AI APIs, TypeScript, and document processing. It demonstrates meaningful interaction with PDFs, productivity-focused features, and innovative approaches to working with AI at scale.
+
 A full-stack AI chat application built with Bun 1.3, React 19, and the AI SDK. Features document chat with RAG (Retrieval-Augmented Generation), multiple AI providers, and project-based conversation organization.
 
-## Features
+## Features Overview
+
+### Batch Questioning
+
+Ask multiple questions at once and get comprehensive answers for each:
+![Batch Questioning](assets/batch-questioning-with-results.png)
+
+_Export results in PDF/Markdown/Docx/Json_
+
+### Multi-Document Chat
+
+Query across multiple documents simultaneously and get consolidated answers:
+![Multi-Doc Chat](assets/multi-doc-chat.png)
+
+_Export results in PDF/Markdown/Docx/Json_
+
+### DeepAgent Analysis
+
+Multi-agent system for comprehensive document analysis with hierarchical processing:
+![DeepAgent Interface](assets/deepagent.png)
+
+### Interactive Results
+
+Split-screen view with clickable page citations and PDF viewer integration:
+![DeepAgent Results](assets/deepagent-with-results.png)
+_Results include proper source citations and integrated PDF viewer for verification_
 
 ### Core Features
+
 - **Project Organization**: Organize conversations into projects
 - **Multiple AI Providers**: Support for OpenAI (GPT-4, GPT-4o) and Anthropic (Claude) models
 - **Streaming Responses**: Real-time streaming of AI responses
@@ -14,12 +42,15 @@ A full-stack AI chat application built with Bun 1.3, React 19, and the AI SDK. F
 - **Dark Mode**: Light, dark, and system theme options
 
 ### Advanced Features
+
 - **Document Chat with RAG**: Upload PDFs and chat with them using vector search
+- **DeepAgent Analysis**: Multi-agent system for comprehensive document analysis with clickable page citations
 - **Weaviate Vector Database**: Semantic search with OpenAI embeddings
 - **S3 Storage**: Document storage on OVH S3
 - **Batch Questioning**: Ask multiple questions across multiple documents
 - **Multi-Document Chat**: Query multiple documents simultaneously
 - **Conversation Export**: Export conversations to JSON, Markdown, DOCX, and PDF
+- **Interactive PDF Viewer**: Split-screen view with clickable page references and scroll preservation
 - **Mock Authentication**: Simple authentication system for development
 
 ## Tech Stack
@@ -118,6 +149,7 @@ The server will run at `http://localhost:3001` by default.
 ### First Login
 
 The application uses mock authentication for development:
+
 - Enter any **username** (e.g., "admin", "demo", "testuser")
 - Enter any **password** (all passwords accepted in dev mode)
 - A user will be automatically created on first login
@@ -207,11 +239,20 @@ src/
 - `GET /api/settings` - Get user preferences
 - `PUT /api/settings` - Update user preferences
 
+### DeepAgent
+
+- `GET /api/deepagent/agents` - List available agent configurations
+- `POST /api/deepagent/run` - Start agent analysis (returns immediately with run ID)
+- `GET /api/deepagent/runs/:id` - Poll for run status and results
+- `GET /api/deepagent/history?limit=50` - Get user's analysis history
+- `GET /api/deepagent/document/:documentId/runs` - Get runs for specific document
+
 ## Database Schema
 
 ### SQLite Database
 
 **users** - User accounts
+
 - `id` - Primary key
 - `email` - User email (unique)
 - `name` - User name
@@ -221,6 +262,7 @@ src/
 - `created_at`, `updated_at` - Timestamps
 
 **user_preferences** - User settings
+
 - `user_id` - Foreign key to users
 - `default_model_provider`, `default_model_name` - AI model defaults
 - `theme` - UI theme ('light' | 'dark' | 'system')
@@ -228,24 +270,28 @@ src/
 - `disclaimer_accepted_at` - Terms acceptance timestamp
 
 **projects** - Project organization
+
 - `id` - Primary key
 - `user_id` - Foreign key to users
 - `name`, `description` - Project info
 - `is_private` - Privacy flag
 
 **conversations** - Chat sessions
+
 - `id` - Primary key
 - `project_id` - Foreign key to projects
 - `title` - Conversation title
 - `model_provider`, `model_name` - AI model used
 
 **messages** - Chat messages
+
 - `id` - Primary key
 - `conversation_id` - Foreign key to conversations
 - `role` - 'user' | 'assistant' | 'system'
 - `content` - Message text
 
 **documents** - Uploaded PDFs
+
 - `id` - Primary key
 - `user_id` - Foreign key to users
 - `filename`, `file_slug` - File identification
@@ -253,7 +299,31 @@ src/
 - `processing_status` - 'pending' | 'processing' | 'completed' | 'failed'
 - `pages_processed`, `chunks_created` - Processing stats
 
+**agent_runs** - DeepAgent execution history
+
+- `id` - UUID primary key
+- `user_id` - Foreign key to users
+- `agent_config_id` - Agent configuration identifier
+- `document_id` - Foreign key to documents
+- `query` - User query or agent default
+- `status` - 'running' | 'completed' | 'failed'
+- `result` - Final analysis result (markdown with page citations)
+- `intermediate_results` - JSON with all phase results
+- `error` - Error message if failed
+- `started_at`, `completed_at` - Timestamps
+- `duration_seconds` - Execution duration
+
+**agent_messages** - DeepAgent step-by-step logs
+
+- `id` - Primary key
+- `agent_run_id` - Foreign key to agent_runs
+- `role` - 'user' | 'assistant' | 'system' | 'tool'
+- `content` - Message content
+- `tool_name`, `tool_input`, `tool_output` - Tool execution details
+- `created_at` - Timestamp
+
 **sessions** - User sessions
+
 - `id` - Session token
 - `user_id` - Foreign key to users
 - `access_token`, `refresh_token` - Auth tokens
@@ -262,10 +332,12 @@ src/
 ### Weaviate Collections
 
 **ParentDocument** - Full page content (no vectorizer)
+
 - `content`, `path`, `page`, `filename` - Page data
 - `company_id`, `company_name`, `report_type`, `reporting_year` - Metadata
 
 **ChildDocument** - Text chunks with embeddings (text2vec-openai)
+
 - Same properties as ParentDocument
 - Automatically vectorized for semantic search
 - References parent page
@@ -298,6 +370,22 @@ src/
    - Vectorization with OpenAI embeddings
 3. **Semantic Search**: Ask questions and get relevant answers from your documents
 4. **Source Attribution**: All answers include page numbers and source text
+
+### DeepAgent Analysis
+
+The application includes a hierarchical multi-agent system for comprehensive document analysis:
+
+1. **Specialized Agents**: Pre-configured agents (e.g., ESG Environmental Strategy Analyst) that perform in-depth analysis
+2. **Three-Phase Analysis**:
+   - **Discovery Phase**: Maps document structure and locates relevant sections
+   - **Extraction Phase**: Four specialized agents run in parallel to extract specific data (emissions, targets, investments, risks)
+   - **Synthesis Phase**: Aggregates findings and produces comprehensive reports
+3. **Interactive Results**:
+   - **Clickable Page Citations**: Results include page references in format `[Page X]` or `[Pages X-Y]`
+   - **Individual Click Support**: Each page number in multi-page references is clickable (e.g., "Pages 1, 3, 10")
+   - **Split-Screen View**: Results displayed on left, PDF viewer on right
+   - **Scroll Preservation**: Scroll position maintained when clicking page references
+4. **Background Processing**: Long-running analyses execute in worker threads with real-time status polling
 
 ### Batch Questioning
 

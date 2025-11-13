@@ -68,6 +68,8 @@ src/
 │   ├── app-sidebar.tsx    # Main application sidebar (shadcn)
 │   ├── language-switcher.tsx # Language selection dropdown
 │   ├── theme-switcher.tsx # Theme selection dropdown (light/dark/system)
+│   ├── MarkdownWithPageLinks.tsx # Markdown renderer with clickable page references
+│   ├── PdfViewer.tsx      # PDF viewer component with navigation controls
 │   └── ui/                # shadcn/ui components
 │       ├── sidebar.tsx    # Shadcn sidebar primitives
 │       ├── button.tsx
@@ -916,6 +918,10 @@ function MyComponent() {
   - History dialog with filterable past runs
   - Markdown-rendered results with proper formatting
   - **Page Citations**: All results include page references in format `[Page X]` or `[Pages X-Y]` for PDF linking
+    - Clickable page references that open PDF viewer to exact page
+    - Individual page numbers are clickable in multi-page references (e.g., "Pages 1, 3, 10" - each number is clickable)
+    - Scroll position preserved when clicking page references (no jumping to top)
+    - Split-screen view with results on left, PDF viewer on right
   - Mobile-responsive design
 
 - ✅ **Developer Experience**
@@ -962,7 +968,57 @@ export const MY_CUSTOM_AGENT: DeepAgentConfig = {
 6. **Phase 2**: Four extraction agents run in parallel, each using discovery context
 7. **Phase 3**: Synthesis agent aggregates findings and produces final report
 8. On completion, synthesis result saved to database with status='completed'
-9. Frontend displays markdown-formatted results
+9. Frontend displays markdown-formatted results with clickable page citations
+
+**MarkdownWithPageLinks Component** (`src/components/MarkdownWithPageLinks.tsx`):
+
+A specialized markdown renderer that detects and converts page references into clickable links:
+
+- **Pattern Detection**: Automatically detects `[Page X]` and `[Pages X-Y]` patterns in markdown text
+- **Preprocessing**: Replaces page references with placeholder markers to prevent markdown parser conflicts
+- **Clickable Links**: Renders page references as interactive elements with FileText icons
+- **Multi-Page Support**: For multiple pages (e.g., `[Pages 1, 3, 10]`), each page number becomes individually clickable
+- **Recursive Processing**: Handles page references in all markdown elements (paragraphs, lists, tables, headings, etc.)
+- **Scroll Preservation**: Uses refs and event handlers to maintain scroll position when clicking references
+- **Accessibility**: Includes keyboard support (Enter/Space) and proper ARIA attributes
+
+**Implementation Details:**
+```typescript
+// Usage in DeepAgentPage
+<ScrollArea ref={scrollAreaRef} className="h-[600px]">
+  <MarkdownWithPageLinks
+    content={result}
+    onPageClick={handlePageClick}
+  />
+</ScrollArea>
+
+// handlePageClick saves scroll position and opens PDF viewer
+const handlePageClick = (pageNumber: number) => {
+  const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+  if (viewport) {
+    lastScrollPosition.current = viewport.scrollTop;
+  }
+  setSelectedPdf({ documentId, filename, pageNumber });
+};
+
+// useEffect restores scroll position after state update
+useEffect(() => {
+  if (selectedPdf) {
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      setTimeout(() => {
+        viewport.scrollTop = lastScrollPosition.current;
+      }, 0);
+    }
+  }
+}, [selectedPdf]);
+```
+
+**Key Features:**
+- Single page: `📄 Page 5` (entire link clickable)
+- Multiple pages: `📄 Pages 1, 3, 10` (each number independently clickable)
+- Works in all markdown contexts: tables, lists, blockquotes, headings
+- No scroll disruption when clicking links
 
 ## Future Enhancements
 
