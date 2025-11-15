@@ -18,8 +18,8 @@ export function getS3Credentials(): S3Credentials {
   const accessKeyId = process.env.S3_ACCESS_KEY_ID;
   const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
   const bucket = process.env.S3_BUCKET || "ai-assistant-storage";
-  const endpoint = process.env.S3_ENDPOINT || "https://s3.gra.io.cloud.ovh.net/";
-  const region = process.env.S3_REGION || "gra";
+  const endpoint = process.env.S3_ENDPOINT || "https://s3.amazonaws.com/";
+  const region = process.env.S3_REGION || "us-east-1";
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error("S3 credentials not found in environment variables");

@@ -43,7 +43,7 @@
 - Backend: Bun.serve() REST API
 - Database: SQLite3
 - Vector DB: Weaviate 1.33.0 with text2vec-openai
-- Storage: OVH S3
+- Storage: S3
 - AI: AI SDK (OpenAI, Anthropic)
 - PDF: pdf-parse v2 with Worker threads
 - i18n: i18next + react-i18next

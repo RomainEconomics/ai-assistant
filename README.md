@@ -4,6 +4,65 @@
 
 A full-stack AI chat application built with Bun 1.3, React 19, and the AI SDK. Features document chat with RAG (Retrieval-Augmented Generation), multiple AI providers, and project-based conversation organization.
 
+## Architecture
+
+The AI Assistant follows a modern full-stack architecture with clear separation of concerns:
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Browser[Browser]
+        React[React 19 + shadcn/ui]
+    end
+
+    subgraph "Server Layer"
+        Bun[Bun Runtime + API Server]
+        Workers[Worker Threads<br/>PDF, DeepAgent]
+    end
+
+    subgraph "AI Layer"
+        AISDK[AI SDK v6]
+        Providers[OpenAI + Anthropic]
+        Agents[Multi-Agent System<br/>Discovery → Extraction → Synthesis]
+    end
+
+    subgraph "Data Layer"
+        SQLite[(SQLite<br/>Relational Data)]
+        Weaviate[(Weaviate<br/>Vector Search)]
+        S3[(S3<br/>Documents)]
+    end
+
+    Browser --> React
+    React --> Bun
+    Bun --> Workers
+    Bun --> AISDK
+    AISDK --> Providers
+    Workers --> Agents
+    Agents --> Weaviate
+    Bun --> SQLite
+    Bun --> Weaviate
+    Bun --> S3
+
+    classDef clientStyle fill:#e1f5ff,stroke:#01579b
+    classDef serverStyle fill:#fff3e0,stroke:#e65100
+    classDef aiStyle fill:#f3e5f5,stroke:#4a148c
+    classDef dataStyle fill:#e8f5e9,stroke:#1b5e20
+
+    class Browser,React clientStyle
+    class Bun,Workers serverStyle
+    class AISDK,Providers,Agents aiStyle
+    class SQLite,Weaviate,S3 dataStyle
+```
+
+**Key Components:**
+
+- **Client**: React 19 with shadcn/ui for modern, accessible UI
+- **Server**: Bun runtime with REST API and background workers
+- **AI**: AI SDK v6 integrating OpenAI and Anthropic models
+- **Storage**: SQLite for relational data, Weaviate for vector search, S3 for documents
+
+**For detailed architecture diagrams including data flows, see [docs/architecture-diagram.md](./docs/architecture-diagram.md)**
+
 ## Features Overview
 
 ### Batch Questioning
@@ -46,7 +105,7 @@ _Results include proper source citations and integrated PDF viewer for verificat
 - **Document Chat with RAG**: Upload PDFs and chat with them using vector search
 - **DeepAgent Analysis**: Multi-agent system for comprehensive document analysis with clickable page citations
 - **Weaviate Vector Database**: Semantic search with OpenAI embeddings
-- **S3 Storage**: Document storage on OVH S3
+- **S3 Storage**: Document storage on S3
 - **Batch Questioning**: Ask multiple questions across multiple documents
 - **Multi-Document Chat**: Query multiple documents simultaneously
 - **Conversation Export**: Export conversations to JSON, Markdown, DOCX, and PDF
@@ -60,7 +119,7 @@ _Results include proper source citations and integrated PDF viewer for verificat
 - **Backend**: Bun.serve() with REST API
 - **Database**: SQLite3 (PostgreSQL-compatible schema)
 - **Vector Database**: Weaviate 1.33.0 with text2vec-openai
-- **Storage**: OVH S3 (via Bun's built-in S3Client)
+- **Storage**: S3-compatible storage (via Bun's built-in S3Client)
 - **AI**: AI SDK with OpenAI and Anthropic providers
 - **State Management**: TanStack Query for data fetching
 - **PDF Processing**: pdf-parse v2 with Worker threads
@@ -75,7 +134,7 @@ _Results include proper source citations and integrated PDF viewer for verificat
 - Docker and Docker Compose (for Weaviate and PostgreSQL)
 - OpenAI API key (required for embeddings and GPT models)
 - Anthropic API key (optional, if using Claude models)
-- OVH S3 credentials (for document storage)
+- S3-compatible storage credentials (for document storage)
 
 ### Installation
 
@@ -111,12 +170,10 @@ NODE_ENV=development
 WEAVIATE_HOST=http://localhost:8080
 WEAVIATE_API_KEY=
 
-# S3 Storage Configuration (OVH)
+# S3 Storage Configuration
 S3_ACCESS_KEY_ID=your_access_key_here
 S3_SECRET_ACCESS_KEY=your_secret_key_here
 S3_BUCKET=ai-assistant-storage
-S3_ENDPOINT=https://s3.gra.io.cloud.ovh.net/
-S3_REGION=gra
 
 # Session Configuration
 SESSION_EXPIRY_DAYS=30

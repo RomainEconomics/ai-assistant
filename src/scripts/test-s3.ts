@@ -118,7 +118,7 @@ async function testS3Connection() {
       console.error("  S3_SECRET_ACCESS_KEY=your_secret_key");
     } else if (error.message?.includes("ECONNREFUSED")) {
       console.error("\nMake sure the S3 endpoint is accessible:");
-      console.error("  S3_ENDPOINT=https://s3.gra.io.cloud.ovh.net/");
+      console.error("  S3_ENDPOINT=https://your-s3-endpoint.com/ (optional, defaults to AWS S3)");
     }
 
     process.exit(1);

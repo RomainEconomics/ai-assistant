@@ -35,7 +35,7 @@ This application provides an in-house chat interface for:
 - **Streaming Responses**: Real-time AI responses using AI SDK streaming
 - **Multi-Provider Support**: Choose between OpenAI and Anthropic models per conversation
 - **Document Chat with RAG**: Upload PDFs, extract text, chunk, embed, and query using Weaviate vector database
-- **S3 Storage**: Store PDF documents in OVH S3 bucket with automatic key generation
+- **S3 Storage**: Store PDF documents in S3 bucket with automatic key generation
 
 ## Tech Stack
 
@@ -47,13 +47,73 @@ This application provides an in-house chat interface for:
 - **Database**: SQLite3 with PostgreSQL-compatible schema (via Bun's SQL API)
 - **AI Integration**: AI SDK 6 Beta (`ai@6.0.0-beta`, `@ai-sdk/openai@3.0.0-beta`, `@ai-sdk/anthropic@3.0.0-beta`)
 - **Vector Database**: Weaviate 1.33.0 with text2vec-openai module
-- **Storage**: OVH S3 (via Bun's built-in S3Client)
+- **Storage**: S3-compatible storage (via Bun's built-in S3Client)
 - **PDF Processing**: pdf-parse v2 with Worker threads
 - **Styling**: Tailwind CSS 4 with custom design tokens
 - **Theming**: next-themes for light/dark mode support
 - **Internationalization**: i18next + react-i18next (English & French)
 
 ## Architecture
+
+### System Overview
+
+The AI Assistant application follows a modern full-stack architecture with clear separation of concerns:
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Browser[Browser]
+        React[React 19 + shadcn/ui]
+    end
+
+    subgraph "Server Layer"
+        Bun[Bun Runtime + API Server]
+        Workers[Worker Threads<br/>PDF, DeepAgent]
+    end
+
+    subgraph "AI Layer"
+        AISDK[AI SDK v6]
+        Providers[OpenAI + Anthropic]
+        Agents[Multi-Agent System<br/>Discovery → Extraction → Synthesis]
+    end
+
+    subgraph "Data Layer"
+        SQLite[(SQLite<br/>Relational Data)]
+        Weaviate[(Weaviate<br/>Vector Search)]
+        S3[(S3 Storage<br/>Documents)]
+    end
+
+    Browser --> React
+    React --> Bun
+    Bun --> Workers
+    Bun --> AISDK
+    AISDK --> Providers
+    Workers --> Agents
+    Agents --> Weaviate
+    Bun --> SQLite
+    Bun --> Weaviate
+    Bun --> S3
+
+    classDef clientStyle fill:#e1f5ff,stroke:#01579b
+    classDef serverStyle fill:#fff3e0,stroke:#e65100
+    classDef aiStyle fill:#f3e5f5,stroke:#4a148c
+    classDef dataStyle fill:#e8f5e9,stroke:#1b5e20
+
+    class Browser,React clientStyle
+    class Bun,Workers serverStyle
+    class AISDK,Providers,Agents aiStyle
+    class SQLite,Weaviate,S3 dataStyle
+```
+
+**Key Architectural Patterns:**
+
+1. **Parent/Child RAG Strategy**: Semantic search on chunks (ChildDocument), retrieve full pages (ParentDocument) for context
+2. **Worker Thread Pattern**: Long-running tasks (PDF processing, DeepAgent) run in separate threads to prevent HTTP timeouts
+3. **Hierarchical Multi-Agent System**: Discovery → Parallel Extraction → Synthesis for comprehensive document analysis
+4. **Streaming Architecture**: Real-time AI responses via Server-Sent Events (SSE) with automatic persistence
+5. **API Proxy Pattern**: PDFs accessed via API endpoints (not direct S3 URLs) for security and CORS handling
+
+**See [docs/architecture-diagram.md](./docs/architecture-diagram.md) for detailed system architecture diagrams and data flows.**
 
 ### Project Structure
 
@@ -94,7 +154,7 @@ src/
 │   ├── i18n.ts            # i18next configuration and helpers
 │   ├── weaviate.ts        # Weaviate client and collection management
 │   ├── pdf-processor.ts   # PDF text extraction and chunking
-│   └── s3-storage.ts      # S3 storage operations (OVH)
+│   └── s3-storage.ts      # S3 storage operations
 ├── locales/               # Translation files
 │   ├── en/
 │   │   └── translation.json # English translations
@@ -335,12 +395,12 @@ NODE_ENV=development
 WEAVIATE_HOST=http://localhost:8080
 WEAVIATE_API_KEY=
 
-# S3 Storage Configuration (OVH)
+# S3 Storage Configuration
 S3_ACCESS_KEY_ID=your_access_key_here
 S3_SECRET_ACCESS_KEY=your_secret_key_here
 S3_BUCKET=ai-assistant-storage
-S3_ENDPOINT=https://s3.gra.io.cloud.ovh.net/
-S3_REGION=gra
+S3_ENDPOINT=https://s3.amazonaws.com/ # Optional, defaults to AWS S3
+S3_REGION=us-east-1 # Optional, defaults to us-east-1
 ```
 
 ### Development
@@ -508,7 +568,7 @@ await childCollection.data.insert({
 
 ### S3 Storage Operations
 
-Using Bun's built-in S3Client for OVH Cloud Storage:
+Using Bun's built-in S3Client for Cloud Storage:
 
 ```typescript
 import { S3Client } from "bun";
@@ -572,7 +632,7 @@ app-storage/              # Project root folder
 
 **IMPORTANT: Always use the API proxy endpoint to access PDFs, never use direct S3 URLs.**
 
-Documents are stored in OVH S3 with the full URL saved in the database (`s3_url` field). However, direct S3 URLs may have CORS restrictions or require authentication, causing 400/403 errors.
+Documents are stored in S3-compatible storage with the full URL saved in the database (`s3_url` field). However, direct S3 URLs may have CORS restrictions or require authentication, causing 400/403 errors.
 
 **Correct approach - Use the API proxy:**
 
@@ -592,7 +652,7 @@ const pdfUrl = `/api/documents/${document.id}/pdf`;
 
 ```typescript
 // ❌ WRONG: Don't use direct S3 URL
-const pdfUrl = document.s3_url; // https://s3.gra.io.cloud.ovh.net/...
+const pdfUrl = document.s3_url;
 
 // This will cause:
 // - 400 Bad Request errors
@@ -613,6 +673,7 @@ const pdfUrl = document.s3_url; // https://s3.gra.io.cloud.ovh.net/...
 **API Endpoint Implementation:**
 
 The `/api/documents/:id/pdf` endpoint (in `src/api/documents.ts`) handles:
+
 1. Document lookup by ID
 2. S3 download using server credentials
 3. Streaming to client with proper headers
@@ -668,7 +729,7 @@ export async function handleDownloadDocument(req: Request, server: Server) {
   - Automatic collection creation on startup
   - Docker Compose integration
 
-- ✅ **S3 Storage (OVH Cloud)**
+- ✅ **S3 Storage**
   - Bun's built-in S3Client integration
   - Hierarchical file organization with project-specific folders
   - SHA256 hashing for deduplication
@@ -701,12 +762,14 @@ export async function handleDownloadDocument(req: Request, server: Server) {
   - Automatic file download with sanitized filenames
 
 **Export Formats:**
+
 - **JSON**: Complete data structure with all metadata and results
 - **Markdown**: Formatted document with headings, metadata, and code blocks for sources
 - **DOCX**: Word document with proper formatting, parsed markdown content, and metadata
 - **PDF**: Professional PDF with text wrapping, page breaks, and structured layout
 
 **Implementation Files:**
+
 - Export utilities: `src/lib/export-utils.ts` (functions: `exportMultiDocToJSON`, `exportMultiDocToMarkdown`, `exportMultiDocToDOCX`, `exportMultiDocToPDF`)
 - API handler: `src/api/rag-multi.ts` (`handleExportMultiDocQuery`)
 - React hook: `src/hooks/useApi.ts` (`useExportMultiDocQuery`)
@@ -754,12 +817,13 @@ export async function handleDownloadDocument(req: Request, server: Server) {
   - Easy to add new languages
 
 **Usage Example:**
+
 ```tsx
 import { useTranslation } from "react-i18next";
 
 function MyComponent() {
   const { t } = useTranslation();
-  return <h1>{t('projects.title')}</h1>;
+  return <h1>{t("projects.title")}</h1>;
 }
 ```
 
@@ -801,6 +865,7 @@ See `I18N_GUIDE.md` for complete documentation.
   - Automatic revert on backend update failure
 
 **Usage Example:**
+
 ```tsx
 import { useTheme } from "@/hooks/useTheme";
 
@@ -814,11 +879,12 @@ function MyComponent() {
   console.log(resolvedTheme); // 'light' | 'dark'
 
   // Change theme
-  await setTheme('dark');
+  await setTheme("dark");
 }
 ```
 
 **Implementation Details:**
+
 - **Component**: `src/components/theme-switcher.tsx`
 - **Hook**: `src/hooks/useTheme.ts`
 - **Translations**: `settings.theme.*` keys in `src/locales/{en,fr}/translation.json`
@@ -934,6 +1000,7 @@ function MyComponent() {
 **Route**: `/deepagent` | **Component**: `src/pages/DeepAgentPage.tsx` | **API**: `src/api/deepagent.ts` | **Worker**: `src/workers/deepagent-worker.ts`
 
 **Agent Implementation Files**:
+
 - `src/lib/agents/coordinator.ts` - Orchestrates the multi-agent system
 - `src/lib/agents/discovery-agent.ts` - Content mapping and section location
 - `src/lib/agents/extraction-agents.ts` - Four specialized extraction agents
@@ -941,12 +1008,14 @@ function MyComponent() {
 - `src/lib/agents/tools.ts` - Weaviate-based search tools
 
 **Dependencies**:
+
 - `ai` - AI SDK v6 with ToolLoopAgent support
 - `@ai-sdk/openai` - OpenAI model integration
 - `weaviate-client` - Vector database access
 - `zod` - Schema validation for tool parameters
 
 **Usage Example:**
+
 ```typescript
 // Add a new agent configuration
 export const MY_CUSTOM_AGENT: DeepAgentConfig = {
@@ -960,6 +1029,7 @@ export const MY_CUSTOM_AGENT: DeepAgentConfig = {
 ```
 
 **How It Works:**
+
 1. User selects agent and document, optionally enters custom query
 2. API creates run record in database with status='running'
 3. Background worker spawned to execute hierarchical agent system
@@ -983,6 +1053,7 @@ A specialized markdown renderer that detects and converts page references into c
 - **Accessibility**: Includes keyboard support (Enter/Space) and proper ARIA attributes
 
 **Implementation Details:**
+
 ```typescript
 // Usage in DeepAgentPage
 <ScrollArea ref={scrollAreaRef} className="h-[600px]">
@@ -1015,6 +1086,7 @@ useEffect(() => {
 ```
 
 **Key Features:**
+
 - Single page: `📄 Page 5` (entire link clickable)
 - Multiple pages: `📄 Pages 1, 3, 10` (each number independently clickable)
 - Works in all markdown contexts: tables, lists, blockquotes, headings
